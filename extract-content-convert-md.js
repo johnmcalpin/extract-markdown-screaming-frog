@@ -4,18 +4,40 @@
  * and converts it to markdown format following Mozilla Readability best practices
  */
 function convertToMarkdown(element) {
+    
     function processNode(node) {
         if (!node) return '';
+        
         if (node.nodeType === 3) {
             let text = node.textContent;
             text = text.replace(/\s+/g, ' ');
             return text;
         }
+        
         if (node.nodeType !== 1) {
             return '';
         }
+        
         const tagName = node.tagName.toLowerCase();
         let result = '';
+        
+        if (['header', 'footer', 'nav', 'aside', 'noscript', 'script', 'style'].indexOf(tagName) !== -1) {
+            return '';
+        }
+        
+        const className = node.className || '';
+        const classString = typeof className === 'string' ? className : '';
+        const role = node.getAttribute('role') || '';
+        
+        if (classString.indexOf('theme-header') !== -1 ||
+            classString.indexOf('theme-footer') !== -1 ||
+            classString.indexOf('loading-animation') !== -1 ||
+            role === 'banner' ||
+            role === 'navigation' ||
+            role === 'complementary') {
+            return '';
+        }
+        
         function getChildrenText() {
             let text = '';
             const children = node.childNodes;
@@ -24,6 +46,7 @@ function convertToMarkdown(element) {
             }
             return text;
         }
+        
         switch (tagName) {
             case 'h1':
                 result = '\n\n# ' + getChildrenText().trim() + '\n\n';
@@ -110,11 +133,6 @@ function convertToMarkdown(element) {
             case 'table':
                 result = '\n\n' + processTable(node) + '\n\n';
                 break;
-            case 'script':
-            case 'style':
-            case 'noscript':
-                result = '';
-                break;
             case 'del':
             case 's':
             case 'strike':
@@ -127,6 +145,7 @@ function convertToMarkdown(element) {
         
         return result;
     }
+    
     function processTable(table) {
         let md = '';
         const rows = table.querySelectorAll('tr');
@@ -135,6 +154,7 @@ function convertToMarkdown(element) {
         
         let headers = [];
         let isFirstRowHeader = false;
+        
         const firstRowCells = rows[0].querySelectorAll('th, td');
         if (rows[0].querySelector('th')) {
             isFirstRowHeader = true;
@@ -142,14 +162,15 @@ function convertToMarkdown(element) {
                 headers.push(firstRowCells[i].textContent.trim());
             }
         } else {
-            // Use first row as headers anyway
             for (let i = 0; i < firstRowCells.length; i++) {
                 headers.push(firstRowCells[i].textContent.trim());
             }
             isFirstRowHeader = true;
         }
+        
         md += '| ' + headers.join(' | ') + ' |\n';
         md += '| ' + headers.map(function() { return '---'; }).join(' | ') + ' |\n';
+        
         const startRow = isFirstRowHeader ? 1 : 0;
         for (let i = startRow; i < rows.length; i++) {
             const cells = rows[i].querySelectorAll('td, th');
@@ -166,6 +187,7 @@ function convertToMarkdown(element) {
     }
     
     let markdown = processNode(element);
+    
     markdown = markdown
         .replace(/\n{3,}/g, '\n\n')
         .replace(/^\s+|\s+$/g, '')
@@ -173,18 +195,17 @@ function convertToMarkdown(element) {
     
     return markdown;
 }
-const unwantedSelectors = ['header', 'footer', 'nav', 'aside', 'noscript'];
-for (let i = 0; i < unwantedSelectors.length; i++) {
-    const elements = document.querySelectorAll(unwantedSelectors[i]);
-    for (let j = 0; j < elements.length; j++) {
-        elements[j].style.display = 'none';
-    }
-}
-let contentRoot = document.querySelector('main') ||
+
+let contentRoot = document.querySelector('.entry-content') ||
+                 document.querySelector('.wp-block-post-content') ||
+                 document.querySelector('main article') ||
+                 document.querySelector('main') ||
                  document.querySelector('article') ||
                  document.querySelector('[role="main"]') ||
                  document.querySelector('.content') ||
                  document.querySelector('.main-content') ||
                  document.body;
+
 const markdownContent = convertToMarkdown(contentRoot);
+
 return seoSpider.data(markdownContent);
